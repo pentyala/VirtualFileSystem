@@ -40,7 +40,7 @@ int clean_vfs() {
 }
 
 int test() {
-  char t[] = "ADITYA IS GREAT";
+  char t[] = "ADITYA IS GREO!";
   int written = file_write_at(store, 0, 1, t, sizeof(t));
   LOG(LOG_INFO, "Written %d bytes", written);
   char te[32];
