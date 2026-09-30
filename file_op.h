@@ -63,6 +63,94 @@ long file_size(char *path) {
   }
 }
 
+int file_write_blocks(FILE *store, long lba, long lbc, void *buf,
+                      long buf_size) {
+  int written = 0;
+
+  if (store == NULL || buf == NULL) {
+    LOG(LOG_ERR, "Invalid input");
+    return -1;
+  }
+
+  if (lbc * BLOCK_SIZE != buf_size) {
+    LOG(LOG_ERR, "Buffer size does not match. Expected %ld, received %ld",
+        lbc * BLOCK_SIZE, buf_size);
+    return -1;
+  }
+
+  void *temp = buf;
+  while (lbc > 0) {
+    written = file_write_block(store, lba, temp, BLOCK_SIZE);
+    if (written != BLOCK_SIZE) {
+      LOG(LOG_ERR, "Failed to write blocks. Expected written %ld, got %ld",
+          BLOCK_SIZE, written);
+      return -1;
+    }
+    temp = (char *)temp + BLOCK_SIZE;
+    lba++;
+  }
+  return 0;
+}
+
+
+int file_write_block(FILE *store, long lba, void *buf,
+                     long buf_size) {
+  // returns the length of bytes written.
+  // Writes a block of data at an logical block address
+  if (store == NULL || buf == NULL) {
+    LOG(LOG_ERR, "Invalid input. Returning");
+    return -1;
+  }
+
+  // Todo: Check if block address is valid
+  if (buf_size != BLOCK_SIZE) {
+    LOG(LOG_ERR, "Input buffer size %ld does not match Buffer size %ld",
+        buf_size, BLOCK_SIZE);
+    return -1;
+  }
+  // TODO: Precheck for valid store.
+  fseek(store, lba, SEEK_SET);
+  int wrote_count = fwrite(buf, 1, buf_size, store);
+  if (wrote_count != buf_size) {
+    LOG(LOG_ERR, "Wrote count does not match");
+    goto cleanup;
+  }
+  LOG(LOG_INFO, "Successfully wrote %ld bytes", wrote_count);
+  fseek(store, 0, SEEK_SET);
+  return wrote_count;
+
+cleanup:
+  fseek(store, 0, SEEK_SET);
+  return -1;
+}
+
+int file_read_block(FILE *store, long lba, void *out,
+                    long out_size) {
+  // out is buf
+  if (store == NULL || out == NULL) {
+    LOG(LOG_ERR, "Invalid input. Returning");
+    return -1;
+  }
+  if (out_size != BLOCK_SIZE) {
+    LOG(LOG_ERR, "Output size mismatch. Expected: %ld, Received: %ld",
+        BLOCK_SIZE, out_size);
+  }
+  fseek(store, lba, SEEK_SET);
+  int read_count = fread(out, 1, out_size, store);
+  // if (read_count != out_size) {
+  //   LOG(LOG_ERR, "Read count does not match");
+  //   goto cleanup;
+  // }
+  LOG(LOG_INFO, "Successfully read %ld bytes", read_count);
+  fseek(store, 0, SEEK_SET);
+  return read_count;
+
+cleanup:
+  fseek(store, 0, SEEK_SET);
+  return -1;
+}
+
+
 int file_read_at(FILE *store, long offset, long blocks, void *out,
                  long out_size) {
   // out is buf

@@ -25,6 +25,16 @@ typedef struct fnode {
   int metadata;
 } fnode;
 
+// block
+typedef struct block {
+  union {
+    inode i_node; // 37 bytes
+    fnode f_node; // 29 bytes
+  }; // 37 bytes
+  char block_type; // 38th byte
+  char data[474]; // BLOCK_SIZE - 38 = 512 - 38
+} block;
+
 // Output structure
 typedef struct vfs_directory {
   char name[MAX_FILE_NAME_SIZE + 1];

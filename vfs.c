@@ -39,7 +39,28 @@ int clean_vfs() {
   LOG(LOG_INFO, "Store closed");
 }
 
+int compare_outputs(void *one, void *two, long size) {
+  return memcmp(one, two, size) == 0;
+}
+
 int test() {
+  char t[512];
+  t[0] = '1';
+  t[4] = '5';
+  t[510] = '2';
+  LOG(LOG_INFO, "test: %s", t);
+  int written = file_write_block(store, 1024, t, sizeof(t));
+  LOG(LOG_INFO, "Wrote %d written bytes", written);
+  char r[512];
+  LOG(LOG_INFO, "Reading");
+  int read = file_read_block(store, 1024, r, sizeof(r));
+  LOG(LOG_INFO, "Read %d bytes", read);
+  LOG(LOG_INFO, "Output: %s", r);
+  LOG(LOG_INFO, "Output compared: %d", compare_outputs(t, r, sizeof(t)));
+  return 0;
+}
+
+int test2() {
   char t[] = "ADITYA IS GREO!";
   int written = file_write_at(store, 0, 1, t, sizeof(t));
   LOG(LOG_INFO, "Written %d bytes", written);
