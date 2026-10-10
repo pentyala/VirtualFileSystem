@@ -23,29 +23,40 @@ VFS_BOOL file_exists(char *path) {
   return VFS_FALSE;
 }
 
-int create_store(char *store_name, long store_size, FILE *out) {
-  FILE *f = out;
+// 1. Change 'FILE *out' to 'FILE **out'
+int create_store(char *store_name, long store_size, FILE **out) {
   if (store_name == NULL || store_size < BLOCK_SIZE) {
     LOG(LOG_ERR, "Input invalid or store size less than block size %d",
         BLOCK_SIZE);
     return -1;
   }
   LOG(LOG_INFO, "Creating a store of name %s and size %ld", store_name, store_size);
-  f = fopen(store_name, "w+b");
+
+  FILE *f = fopen(store_name, "w+b");
   if (f == NULL) {
     LOG(LOG_ERR, "Failed to create file: %s", store_name);
     return -1;
   }
+
   int result = posix_fallocate(fileno(f), 0, store_size);
   if (result != 0) {
-    LOG(LOG_ERR, "Failed to allocate %ld bytes of file: %d", store_size,
-        result);
+    LOG(LOG_ERR, "Failed to allocate %ld bytes of file: %d", store_size, result);
     goto cleanup_fallocate;
   }
+
   fclose(f);
-  return fopen(store_name, "r+b");
-cleanup_fallocate:
-  fclose(f);
+
+  // 2. Open the file in read/write mode and assign it to the pointer-to-pointer
+  *out = fopen(store_name, "r+b");
+  if (*out == NULL) {
+    LOG(LOG_ERR, "Failed to reopen file: %s", store_name);
+    return -1;
+  }
+
+  return 0; // Return a success status integer
+
+  cleanup_fallocate:
+    fclose(f);
   return -1;
 }
 
@@ -62,36 +73,6 @@ long file_size(char *path) {
       LOG(LOG_ERR, "Error getting file attributes");
   }
 }
-
-int file_write_blocks(FILE *store, long lba, long lbc, void *buf,
-                      long buf_size) {
-  int written = 0;
-
-  if (store == NULL || buf == NULL) {
-    LOG(LOG_ERR, "Invalid input");
-    return -1;
-  }
-
-  if (lbc * BLOCK_SIZE != buf_size) {
-    LOG(LOG_ERR, "Buffer size does not match. Expected %ld, received %ld",
-        lbc * BLOCK_SIZE, buf_size);
-    return -1;
-  }
-
-  void *temp = buf;
-  while (lbc > 0) {
-    written = file_write_block(store, lba, temp, BLOCK_SIZE);
-    if (written != BLOCK_SIZE) {
-      LOG(LOG_ERR, "Failed to write blocks. Expected written %ld, got %ld",
-          BLOCK_SIZE, written);
-      return -1;
-    }
-    temp = (char *)temp + BLOCK_SIZE;
-    lba++;
-  }
-  return 0;
-}
-
 
 int file_write_block(FILE *store, long lba, void *buf,
                      long buf_size) {
@@ -122,6 +103,35 @@ int file_write_block(FILE *store, long lba, void *buf,
 cleanup:
   fseek(store, 0, SEEK_SET);
   return -1;
+}
+
+int file_write_blocks(FILE *store, long lba, long lbc, void *buf,
+                      long buf_size) {
+  int written = 0;
+
+  if (store == NULL || buf == NULL) {
+    LOG(LOG_ERR, "Invalid input");
+    return -1;
+  }
+
+  if (lbc * BLOCK_SIZE != buf_size) {
+    LOG(LOG_ERR, "Buffer size does not match. Expected %ld, received %ld",
+        lbc * BLOCK_SIZE, buf_size);
+    return -1;
+  }
+
+  void *temp = buf;
+  while (lbc > 0) {
+    written = file_write_block(store, lba, temp, BLOCK_SIZE);
+    if (written != BLOCK_SIZE) {
+      LOG(LOG_ERR, "Failed to write blocks. Expected written %ld, got %ld",
+          BLOCK_SIZE, written);
+      return -1;
+    }
+    temp = (char *)temp + BLOCK_SIZE;
+    lba++;
+  }
+  return 0;
 }
 
 int file_read_block(FILE *store, long lba, void *out,

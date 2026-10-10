@@ -27,7 +27,7 @@ int init_vfs() {
   } else {
     LOG(LOG_INFO, "Store does not exist. Starting clean");
     LOG(LOG_INFO, "Creating a file: %s", default_store_name);
-    create_store(default_store_name, STORE_SIZE, store);
+    create_store(default_store_name, STORE_SIZE, &store);
     LOG(LOG_INFO, "Created the store...");
   }
   return 0;
